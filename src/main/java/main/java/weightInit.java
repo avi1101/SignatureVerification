@@ -30,6 +30,9 @@ import java.util.Random;
 
 public class weightInit {
     public static void main(String[] args) throws Exception {
+        /**
+         * Configuration of the autoencoder neural network from which we get the first layer's weights
+         */
         MultiLayerConfiguration autoencoderConfig = new NeuralNetConfiguration.Builder()
                 .seed(12345)
                 .iterations(1)
@@ -52,44 +55,48 @@ public class weightInit {
                 .pretrain(false).backprop(true)
                 .build();
 
-        MultiLayerNetwork autoencoder = new MultiLayerNetwork(autoencoderConfig);
-        autoencoder.setListeners(Collections.singletonList((IterationListener) new ScoreIterationListener(1)));
-        DataSetIterator mnistIter = new MnistDataSetIterator(100, 50000, false);
-        List<INDArray> inputFeaturesTrain = new ArrayList<INDArray>();
-        List<INDArray> inputFeaturesTest = new ArrayList<INDArray>();
-        List<INDArray> inputLabelsTest = new ArrayList<INDArray>();
 
+        MultiLayerNetwork autoencoder = new MultiLayerNetwork(autoencoderConfig);       // the autoencoder neural network based on the config
+        autoencoder.setListeners(Collections.singletonList((IterationListener)          //scoreListener for the autoencoder neural network
+                new ScoreIterationListener(1)));
+        DataSetIterator mnistIter = new MnistDataSetIterator(100, 50000, false);
+        List<INDArray> inputFeaturesTrain = new ArrayList<INDArray>();      // list of mnist data ferature's to train the network
+        List<INDArray> inputFeaturesTest = new ArrayList<INDArray>();   //list of mnist data ferature's to test the network
+        List<INDArray> inputLabelsTest = new ArrayList<INDArray>(); //list of mnist data labels to check the test output
+
+
+        /**
+         * Mnist iterator for the data, fill the lists above
+         */
         Random r = new Random(12345);
         while (mnistIter.hasNext()) {
             DataSet ds = mnistIter.next();
-            // 80/20 split (from miniBatch = 100)
             SplitTestAndTrain split = ds.splitTestAndTrain(80, r);
             inputFeaturesTrain.add(split.getTrain().getFeatureMatrix());
             DataSet dsTest = split.getTest();
             inputFeaturesTest.add(dsTest.getFeatureMatrix());
-            // Convert from one-hot representation -> index
-            INDArray indexes = Nd4j.argMax(dsTest.getLabels(), 1);
+            INDArray indexes = Nd4j.argMax(dsTest.getLabels(),1);
             inputLabelsTest.add(indexes);
         }
 
-        Layer autoencoderFirstlayer_preTrain = autoencoder.getLayer(0);
-        INDArray preTrainweights = autoencoderFirstlayer_preTrain.params();
+        Layer autoencoderFirstlayer_preTrain = autoencoder.getLayer(0);    //get the first layer of the autoencoder NN before training
+        INDArray preTrainweights = autoencoderFirstlayer_preTrain.params(); // gets the weights from the first layer
       //  DataBuffer dataBuffer = preTrainweights.data();
        // double[] array = dataBuffer.asDouble();
 
-        // Train model:
+        // Train  the model:
         int nEpochs = 3;
         for (int epoch = 0; epoch < nEpochs; epoch++) {
             for (INDArray data : inputFeaturesTrain) {
                 autoencoder.fit(data, data);
             }
         }
-        Layer autoencoderLayer_afterTrain = autoencoder.getLayer(0);
-        INDArray trainWeights = autoencoderLayer_afterTrain.params();
+        Layer autoencoderLayer_afterTrain = autoencoder.getLayer(0); //get the first layer of the autoencoder NN after training
+        INDArray trainWeights = autoencoderLayer_afterTrain.params();// gets the weights from the first layer
       //  DataBuffer dataBuffer1 = trainWeights.data();
 
 /**
- * this part adds uses the found weights to calculate a new autoencoder
+ * Configuration of the autoencoder neural network to which we will add the weights
  */
 
         MultiLayerConfiguration autoencoderTestConfig = new NeuralNetConfiguration.Builder()
@@ -113,18 +120,22 @@ public class weightInit {
                         .build())
                 .pretrain(false).backprop(true)
                 .build();
-        MultiLayerNetwork autoencoderTestingNet = new MultiLayerNetwork(autoencoderTestConfig);
-        autoencoderTestingNet.setListeners(Collections.singletonList((IterationListener) new ScoreIterationListener(1)));
-        Layer autoencoderTestingFirstLayer = autoencoderTestingNet.getLayer(0);
-        autoencoderTestingFirstLayer.setParamsViewArray(trainWeights);
+
+        MultiLayerNetwork autoencoderTestingNet = new MultiLayerNetwork(autoencoderTestConfig); //builds a NN based on the known weights
+        autoencoderTestingNet.setListeners(Collections.singletonList((IterationListener) new ScoreIterationListener(1))); //score iterator for the NN
+       // autoencoderTestingNet.setParams(trainWeights);
+        Layer autoencoderTestingFirstLayer = autoencoderTestingNet.getLayer(0); //gets the first layer of the tested NN
+        autoencoderTestingFirstLayer.setParams(trainWeights);        //sets the weights to the given layer
+        autoencoderTestingNet.setLayers(new Layer[]{autoencoderTestingFirstLayer}); //adds the layer TODO try to replace first layer with this
         //autoencoderTestingFirstLayer.setParams(trainWeights);
        // autoencoderTestingNet.setParams(trainWeights);
 
 
-        mnistIter.reset();
+        mnistIter.reset();  //reset the iterator
         List<INDArray> autoencoderTestingFeaturesTrain = new ArrayList<INDArray>();
         List<INDArray> autoencoderTestingFeaturesTest = new ArrayList<INDArray>();
         List<INDArray> autoencoderTestingLabelsTest = new ArrayList<INDArray>();
+
         while (mnistIter.hasNext()) {
             DataSet ds2 = mnistIter.next();
             // 80/20 split (from miniBatch = 100)
@@ -160,6 +171,10 @@ public class weightInit {
              System.out.println(" ");
              }
              **/
+
+        /**
+         * evaluate the NN
+         */
         for (int i = 0; i < nEpochs; i++) {
             //autoencoder.pretrain(mnistIter);
             System.out.format("Completed epoch %d", i);
